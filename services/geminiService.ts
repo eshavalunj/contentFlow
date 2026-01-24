@@ -1,37 +1,9 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { ContentTheme, Platform, SocialPost, PostVersion } from "../types";
+import { ContentTheme, Platform, SocialPost, PostVersion, PostFrame } from "../types";
 
 // Helper to generate IDs
 const generateId = () => Math.random().toString(36).substr(2, 9);
-
-/**
- * Generates an image based on a text prompt using gemini-2.5-flash-image.
- */
-export const generateImage = async (prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: `A professional social media graphic: ${prompt}` }],
-      },
-      config: {
-        imageConfig: { aspectRatio: "1:1" }
-      }
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("No image data");
-  } catch (error) {
-    console.error("Image generation failed:", error);
-    return `https://picsum.photos/seed/${generateId()}/800/800`;
-  }
-};
 
 export const generateCampaignContent = async (
   sourceText: string,
@@ -42,20 +14,21 @@ export const generateCampaignContent = async (
   const platformNames = platforms.join(", ");
 
   const systemInstruction = `
-    You are an expert social media strategist. 
-    Analyze source material and create a campaign with 2 themes.
+    You are an expert social media strategist and creative director. 
+    Analyze source material and create a multi-part social media campaign with high stylistic diversity.
     
-    For each theme and EACH platform (${platformNames}), generate 3 independent stylistic VERSIONS of the post (e.g., "The Star Wars Way", "The Indian Way", "Corporate Minimalist").
-    Each version is a SINGLE post with text and an image prompt. 
-    Do not generate sequences or carousels, only independent options.
-    
-    Return valid JSON.
+    1. Identify 2 distinct thematic angles (themes).
+    2. For EACH theme and EACH platform (${platformNames}), generate 2 distinct STYLISTIC VERSIONS (e.g., "The Educational Way", "The Storytelling Way", "The Aggressive Hook Way", "The Star Wars Way").
+    3. Each version must be a series of 3 frames (slides for Instagram, thread items for Twitter/LinkedIn).
+    4. Return valid JSON only.
   `;
 
   const prompt = `
-    Analyze source: "${sourceText.substring(0, 5000)}"
-    Intent: "${intent}"
-    Platforms: ${platformNames}
+    Analyze this source: "${sourceText.substring(0, 8000)}"
+    Objective: "${intent}"
+    Requested Channels: ${platformNames}
+    
+    For each channel, I need 2 distinct versions, and each version should have a sequence of 3 frames.
   `;
 
   try {
@@ -86,9 +59,17 @@ export const generateCampaignContent = async (
                           items: {
                             type: Type.OBJECT,
                             properties: {
-                              label: { type: Type.STRING },
-                              content: { type: Type.STRING },
-                              imageDescription: { type: Type.STRING }
+                              label: { type: Type.STRING, description: "Style description, e.g., 'The Star Wars way'" },
+                              frames: {
+                                type: Type.ARRAY,
+                                items: {
+                                  type: Type.OBJECT,
+                                  properties: {
+                                    content: { type: Type.STRING },
+                                    imageDescription: { type: Type.STRING }
+                                  }
+                                }
+                              }
                             }
                           }
                         }
@@ -104,7 +85,9 @@ export const generateCampaignContent = async (
       }
     });
 
-    const parsed = JSON.parse(response.text.replace(/```json/g, '').replace(/```/g, '').trim());
+    let jsonText = response.text || "";
+    const cleanedJson = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanedJson);
     
     return parsed.themes.map((theme: any): ContentTheme => ({
       id: generateId(),
@@ -116,29 +99,49 @@ export const generateCampaignContent = async (
         versions: post.versions.map((v: any): PostVersion => ({
           id: generateId(),
           label: v.label,
-          content: v.content,
-          imageDescription: v.imageDescription,
-          isApproved: false,
-          scheduledDates: [],
-          imageUrl: `https://picsum.photos/seed/${generateId()}/800/800`
+          status: 'PENDING',
+          frames: v.frames.map((f: any): PostFrame => ({
+            id: generateId(),
+            content: f.content,
+            imageDescription: f.imageDescription
+          }))
         }))
       }))
     }));
 
   } catch (error) {
-    console.error("Fallback to mock data:", error);
+    console.error("Gemini Error, falling back to mock:", error);
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
     return [
       {
         id: generateId(),
-        title: "Future of Transformers",
-        rationale: "Positioning AI education through culturally relevant lenses.",
+        title: "Knowledge Transfer",
+        rationale: "Positioning complex information as accessible lore.",
         posts: platforms.map(p => ({
           id: generateId(),
           platform: p,
           versions: [
-            { id: generateId(), label: "The Star Wars way", content: "May the Transformers be with you. Exploring the Jedi wisdom of attention mechanisms.", imageDescription: "Cinematic space battle with transformer architecture floating in stardust.", isApproved: false, scheduledDates: [], imageUrl: `https://picsum.photos/seed/${generateId()}/800/800` },
-            { id: generateId(), label: "The Indian way", content: "Namaste! Integrating modern ML with timeless engineering patterns.", imageDescription: "Intricate mandala patterns merging with circuit board diagrams.", isApproved: false, scheduledDates: [], imageUrl: `https://picsum.photos/seed/${generateId()}/800/800` },
-            { id: generateId(), label: "Minimalist Executive", content: "Efficiency redefined. The transformer standard.", imageDescription: "Clean typography on slate grey concrete background.", isApproved: false, scheduledDates: [], imageUrl: `https://picsum.photos/seed/${generateId()}/800/800` }
+            {
+              id: generateId(),
+              label: "The Star Wars way",
+              status: 'PENDING',
+              frames: Array.from({length: 3}).map((_, i) => ({
+                id: generateId(),
+                content: `In a galaxy far away, episode ${i+1}... learning about transformers is the ultimate force.`,
+                imageDescription: `Cinematic Star Wars aesthetic slide ${i+1}`
+              }))
+            },
+            {
+              id: generateId(),
+              label: "The Indian way",
+              status: 'PENDING',
+              frames: Array.from({length: 3}).map((_, i) => ({
+                id: generateId(),
+                content: `Namaste! Let's explore the traditional wisdom of architecture ${i+1}.`,
+                imageDescription: `Vibrant Indian cultural motifs and patterns slide ${i+1}`
+              }))
+            }
           ]
         }))
       }

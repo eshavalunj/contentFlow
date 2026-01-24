@@ -21,11 +21,11 @@ export const generateCampaignZip = async (campaign: Campaign): Promise<Blob> => 
             post.versions.forEach((v, vIndex) => {
                 const versionFolder = platformFolder.folder(`Version_${vIndex + 1}_${v.label.replace(/\s+/g, '_')}`);
                 if (versionFolder) {
-                    // Fix: PostVersion represents a single post, not a collection of frames.
-                    // Correcting the logic to export the version's content directly.
-                    const filename = `content.txt`;
-                    const fileContent = `LABEL: ${v.label}\n\nCOPY:\n${v.content}\n\nIMAGE PROMPT:\n${v.imageDescription}`;
-                    versionFolder.file(filename, fileContent);
+                    v.frames.forEach((frame, fIndex) => {
+                        const filename = `frame_${fIndex + 1}.txt`;
+                        const content = `FRAME: ${fIndex + 1}\n\nCOPY:\n${frame.content}\n\nIMAGE PROMPT:\n${frame.imageDescription}`;
+                        versionFolder.file(filename, content);
+                    });
                 }
             });
         }
