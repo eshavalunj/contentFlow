@@ -132,7 +132,7 @@ const ReviewStage: React.FC<ReviewStageProps> = ({ themes, onUpdate, onNext }) =
                               className="w-full h-full object-cover grayscale opacity-80"
                            />
                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent flex items-end p-4">
-                              <span className="text-white text-[10px] font-black uppercase tracking-widest border-b-2 border-white/50 pb-1">Slide {fIdx + 1}</span>
+                              <span className="text-white text-[10px] font-black uppercase tracking-widest border-b-2 border-white/50 pb-1">post {fIdx + 1}</span>
                            </div>
                         </div>
 
