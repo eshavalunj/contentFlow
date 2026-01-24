@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
-import { Campaign, ContentTheme } from '../types';
-import { Calendar as CalendarIcon, Download, CheckCircle, Clock, X, ArrowRight } from 'lucide-react';
+import { Campaign, ContentTheme, SocialPost, PostVersion } from '../types';
+import { Calendar as CalendarIcon, Download, CheckCircle, Clock, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { generateCampaignZip } from '../services/zipService';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ScheduleStageProps {
   campaign: Campaign;
@@ -15,12 +14,63 @@ const ScheduleStage: React.FC<ScheduleStageProps> = ({ campaign, onUpdateCampaig
   const [downloading, setDownloading] = React.useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleDateChange = (themeId: string, postId: string, date: string) => {
+  const approvedVersions = campaign.themes.flatMap(t => 
+    t.posts.flatMap(p => 
+      p.versions.filter(v => v.isApproved).map(v => ({ ...v, platform: p.platform, themeId: t.id, postId: p.id }))
+    )
+  );
+
+  const handleAddSlot = (themeId: string, postId: string, versionId: string) => {
     const updatedThemes = campaign.themes.map(t => {
       if (t.id !== themeId) return t;
       return {
         ...t,
-        posts: t.posts.map(p => p.id === postId ? { ...p, scheduledDate: date } : p)
+        posts: t.posts.map(p => {
+          if (p.id !== postId) return p;
+          return {
+            ...p,
+            versions: p.versions.map(v => v.id === versionId ? { ...v, scheduledDates: [...v.scheduledDates, ''] } : v)
+          };
+        })
+      };
+    });
+    onUpdateCampaign({ ...campaign, themes: updatedThemes });
+  };
+
+  const handleUpdateSlot = (themeId: string, postId: string, versionId: string, idx: number, value: string) => {
+    const updatedThemes = campaign.themes.map(t => {
+      if (t.id !== themeId) return t;
+      return {
+        ...t,
+        posts: t.posts.map(p => {
+          if (p.id !== postId) return p;
+          return {
+            ...p,
+            versions: p.versions.map(v => {
+              if (v.id !== versionId) return v;
+              const newDates = [...v.scheduledDates];
+              newDates[idx] = value;
+              return { ...v, scheduledDates: newDates };
+            })
+          };
+        })
+      };
+    });
+    onUpdateCampaign({ ...campaign, themes: updatedThemes });
+  };
+
+  const handleRemoveSlot = (themeId: string, postId: string, versionId: string, idx: number) => {
+    const updatedThemes = campaign.themes.map(t => {
+      if (t.id !== themeId) return t;
+      return {
+        ...t,
+        posts: t.posts.map(p => {
+          if (p.id !== postId) return p;
+          return {
+            ...p,
+            versions: p.versions.map(v => v.id === versionId ? { ...v, scheduledDates: v.scheduledDates.filter((_, i) => i !== idx) } : v)
+          };
+        })
       };
     });
     onUpdateCampaign({ ...campaign, themes: updatedThemes });
@@ -33,171 +83,100 @@ const ScheduleStage: React.FC<ScheduleStageProps> = ({ campaign, onUpdateCampaig
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${campaign.name.replace(/\s+/g, '_')}_Campaign.zip`;
+      a.download = `${campaign.name.replace(/\s+/g, '_')}.zip`;
       a.click();
     } catch (e) {
       console.error(e);
-      alert('Error generating zip');
     } finally {
       setDownloading(false);
     }
   };
 
-  const handleExecute = () => {
-    setShowSuccess(true);
-  };
-
-  // Mock data for the chart
-  const data = [
-    { name: 'Mon', engagement: 2000 },
-    { name: 'Tue', engagement: 3000 },
-    { name: 'Wed', engagement: 2500 },
-    { name: 'Thu', engagement: 4500 },
-    { name: 'Fri', engagement: 3800 },
-    { name: 'Sat', engagement: 1500 },
-    { name: 'Sun', engagement: 1800 },
-  ];
-
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto relative">
-      
-      {/* Success Modal */}
+    <div className="space-y-8 animate-in fade-in duration-300 max-w-6xl mx-auto pb-20">
       {showSuccess && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-in fade-in zoom-in duration-300">
-           <div className="bg-white max-w-lg w-full p-10 shadow-2xl border-t-8 border-indigo-600 relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                <CheckCircle size={160} className="text-indigo-600" />
-             </div>
-             
-             <div className="relative z-10 text-center space-y-6">
-                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                   <CheckCircle size={40} />
-                </div>
-                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Campaign Queued</h3>
-                <p className="text-slate-500 font-mono text-sm leading-relaxed">
-                   The campaign <span className="text-indigo-600 font-bold">"{campaign.name}"</span> has been successfully injected into the global deployment pipeline. 
-                   Posts will trigger automatically at their scheduled timestamps.
-                </p>
-                <div className="pt-4 flex flex-col space-y-3">
-                   <button 
-                    onClick={onDashboardReturn}
-                    className="w-full py-4 bg-indigo-600 text-white font-bold uppercase tracking-widest text-xs hover:bg-indigo-700 transition-colors flex items-center justify-center space-x-2"
-                   >
-                     <span>Return to Workspace</span>
-                     <ArrowRight size={14} />
-                   </button>
-                   <button 
-                    onClick={() => setShowSuccess(false)}
-                    className="w-full py-4 border border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-xs hover:bg-slate-50"
-                   >
-                     Stay in Editor
-                   </button>
-                </div>
-             </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-xl">
+           <div className="bg-white max-w-lg w-full p-12 text-center shadow-2xl border-t-[12px] border-indigo-600">
+                <CheckCircle size={48} className="text-emerald-500 mx-auto mb-6" />
+                <h3 className="text-3xl font-black uppercase italic mb-4 tracking-tighter">Queue Ready</h3>
+                <p className="text-slate-500 font-mono text-xs mb-10">Deployments propagated to core buffers.</p>
+                <button onClick={onDashboardReturn} className="w-full py-4 bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg">Return to Workspace</button>
            </div>
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
-           <h2 className="text-2xl font-bold text-slate-900 uppercase tracking-tight">Deployment</h2>
-           <p className="text-slate-500 font-mono text-sm">Finalize timeline. Export assets.</p>
+           <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Schedule Sync</h2>
+           <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest mt-1">Allocating time slots for approved versions.</p>
         </div>
-        <div className="flex gap-3">
-           <button 
-             onClick={handleDownload}
-             disabled={downloading}
-             className="flex items-center space-x-2 px-6 py-3 bg-slate-800 text-white hover:bg-slate-900 transition-colors shadow-md disabled:opacity-70 font-bold uppercase tracking-wider text-sm"
-           >
-             {downloading ? (
-                <span>Archiving...</span>
-             ) : (
-               <>
-                 <Download size={18} />
-                 <span>Download ZIP</span>
-               </>
-             )}
+        <div className="flex space-x-3">
+           <button onClick={handleDownload} disabled={downloading} className="px-5 py-2 border-2 border-slate-900 text-[10px] font-black uppercase tracking-widest flex items-center space-x-2">
+             <Download size={14} />
+             <span>{downloading ? "Archiving..." : "Export Assets"}</span>
            </button>
-           <button 
-            onClick={handleExecute}
-            className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-md font-bold uppercase tracking-wider text-sm"
-           >
-             <CheckCircle size={18} />
-             <span>Execute Schedule</span>
+           <button onClick={() => setShowSuccess(true)} className="px-6 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+             <span>Deploy Pipeline</span>
            </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Scheduling List */}
-        <div className="lg:col-span-2 space-y-6">
-          {campaign.themes.map(theme => (
-            <div key={theme.id} className="bg-white border border-slate-200 shadow-sm">
-              <div className="bg-slate-50 px-6 py-3 border-b border-slate-200">
-                <h3 className="font-bold text-slate-700 uppercase tracking-wide text-sm">{theme.title}</h3>
+      {approvedVersions.length === 0 ? (
+        <div className="h-64 flex flex-col items-center justify-center bg-white border-2 border-dashed border-slate-200 text-slate-400">
+           <AlertCircle size={32} className="mb-4 opacity-30" />
+           <p className="text-xs font-mono uppercase">No versions approved for scheduling.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {approvedVersions.map((v) => (
+            <div key={v.id} className="bg-white border border-slate-200 p-6 shadow-sm flex flex-col space-y-4">
+              <div className="flex justify-between items-start">
+                 <div className="flex items-center space-x-3">
+                    <span className="bg-slate-900 text-white px-2 py-1 font-black text-[9px] italic uppercase">{v.platform}</span>
+                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{v.label}</span>
+                 </div>
+                 <button 
+                  onClick={() => handleAddSlot(v.themeId, v.postId, v.id)}
+                  className="text-[9px] font-black text-indigo-600 uppercase flex items-center hover:underline"
+                 >
+                    <Plus size={12} className="mr-1" /> Add Time Slot
+                 </button>
               </div>
-              <div className="divide-y divide-slate-100">
-                {theme.posts.map(post => (
-                  <div key={post.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-start space-x-4">
-                      <div className={`p-2 bg-slate-100 border border-slate-200`}>
-                        <span className="text-slate-900 font-bold text-xs uppercase">{post.platform.substring(0,2)}</span>
+
+              <div className="flex items-center space-x-4">
+                 <div className="w-16 h-16 bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
+                    <img src={v.imageUrl} className="w-full h-full object-cover" />
+                 </div>
+                 <div className="flex-1">
+                    <p className="text-[10px] font-mono text-slate-500 italic line-clamp-2">"{v.content}"</p>
+                 </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                 {v.scheduledDates.map((date, idx) => (
+                   <div key={idx} className="flex items-center space-x-2">
+                      <div className="relative flex-1">
+                        <Clock size={12} className="absolute left-3 top-3 text-slate-400" />
+                        <input 
+                          type="datetime-local"
+                          className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 text-[10px] font-mono outline-none focus:border-indigo-600"
+                          value={date}
+                          onChange={(e) => handleUpdateSlot(v.themeId, v.postId, v.id, idx, e.target.value)}
+                        />
                       </div>
-                      <div className="max-w-md">
-                        <p className="text-sm text-slate-800 line-clamp-2 font-medium">{post.content}</p>
-                        <p className="text-xs text-slate-400 mt-1 font-mono">IMG_PROMPT: {post.imageDescription.substring(0, 30)}...</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                       <div className="relative">
-                         <div className="absolute left-3 top-3 text-slate-400">
-                           <CalendarIcon size={14} />
-                         </div>
-                         <input 
-                           type="datetime-local" 
-                           className="pl-9 pr-3 py-2 text-sm border border-slate-200 focus:border-indigo-600 focus:ring-0 outline-none bg-slate-50 hover:bg-white transition-colors font-mono"
-                           value={post.scheduledDate || ''}
-                           onChange={(e) => handleDateChange(theme.id, post.id, e.target.value)}
-                         />
-                       </div>
-                    </div>
-                  </div>
-                ))}
+                      <button onClick={() => handleRemoveSlot(v.themeId, v.postId, v.id, idx)} className="p-2 text-slate-400 hover:text-red-500">
+                        <Trash2 size={14} />
+                      </button>
+                   </div>
+                 ))}
+                 {v.scheduledDates.length === 0 && (
+                    <p className="text-[9px] text-slate-400 font-mono italic">No slots allocated.</p>
+                 )}
               </div>
             </div>
           ))}
         </div>
-
-        {/* Analytics/Preview Side */}
-        <div className="space-y-6">
-           <div className="bg-white p-6 border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-6 flex items-center space-x-2 uppercase text-xs tracking-widest border-b border-slate-100 pb-2">
-                <Clock size={16} className="text-indigo-600" />
-                <span>Impact Projection</span>
-              </h3>
-              <div className="h-48 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data}>
-                    <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} tick={{fill: '#94a3b8', fontFamily: 'monospace'}} />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '0px', border: '1px solid #e2e8f0', boxShadow: 'none' }} 
-                      cursor={{fill: '#f1f5f9'}}
-                    />
-                    <Bar dataKey="engagement" fill="#4f46e5" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="text-xs text-slate-400 mt-4 text-center font-mono">ESTIMATED REACH BASED ON POSTING TIME</p>
-           </div>
-           
-           <div className="bg-slate-900 p-6 text-white shadow-lg border border-slate-800">
-              <h4 className="font-bold text-lg mb-2 uppercase tracking-wide text-indigo-400">System Insight</h4>
-              <p className="text-slate-300 text-sm font-mono leading-relaxed">Optimization algorithms suggest Tuesday windows (0900-1100 EST) yield 15% higher engagement on B2B vectors.</p>
-           </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

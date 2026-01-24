@@ -5,13 +5,20 @@ export type AppView = 'DASHBOARD' | 'CAMPAIGNS' | 'SCHEDULE' | 'SETTINGS';
 
 export type PostStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'SCHEDULED';
 
+export interface PostVersion {
+  id: string;
+  label: string;
+  content: string;
+  imageDescription: string;
+  imageUrl?: string;
+  isApproved: boolean;
+  scheduledDates: string[];
+}
+
 export interface SocialPost {
   id: string;
   platform: Platform;
-  content: string;
-  imageDescription: string;
-  scheduledDate?: string; // ISO String
-  status: PostStatus;
+  versions: PostVersion[];
 }
 
 export interface ContentTheme {

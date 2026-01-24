@@ -9,22 +9,19 @@ import GlobalSchedule from './components/GlobalSchedule';
 import Settings from './components/Settings';
 import { AppStep, Campaign, AppView, Platform } from './types';
 import { generateCampaignContent } from './services/geminiService';
-import { Plus, Zap, Cpu } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>('DASHBOARD');
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
-  const [loading, setLoading] = useState(false);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
-  const [loaderMsg, setLoaderMsg] = useState('Initializing Core Engine');
+  const [loaderMsg, setLoaderMsg] = useState('Synthesizing Core Engine');
 
   const loaderMessages = [
-    'Mapping thematic clusters...',
-    'Optimizing channel fidelity...',
-    'Cross-referencing source vectors...',
-    'Synthesizing creative direction...',
-    'Finalizing metadata payloads...',
-    'Buffering visual assets...'
+    'Clustering thematic data...',
+    'Optimizing style vectors...',
+    'Generating creative variations...',
+    'Buffering assets...'
   ];
 
   useEffect(() => {
@@ -34,13 +31,12 @@ const App: React.FC = () => {
       interval = setInterval(() => {
         setLoaderMsg(loaderMessages[idx % loaderMessages.length]);
         idx++;
-      }, 2500);
+      }, 1500);
     }
     return () => clearInterval(interval);
   }, [step]);
 
   const handleInputComplete = async (sourceText: string, intent: string, name: string, platforms: Platform[]) => {
-    setLoading(true);
     setStep(AppStep.GENERATING);
     try {
       const themes = await generateCampaignContent(sourceText, intent, platforms);
@@ -56,8 +52,6 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Generation failed:", error);
       setStep(AppStep.INPUT);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -73,33 +67,18 @@ const App: React.FC = () => {
     }
     if (step === AppStep.GENERATING) {
       return (
-        <div className="h-[70vh] flex flex-col items-center justify-center space-y-12 text-center animate-in fade-in zoom-in duration-500">
-          <div className="relative flex items-center justify-center">
-            <div className="absolute w-56 h-56 border border-indigo-500/10 rounded-full animate-pulse scale-110"></div>
-            <div className="absolute w-44 h-44 border border-indigo-600/20 rounded-full animate-[ping_3s_linear_infinite]"></div>
-            <div className="w-24 h-24 bg-slate-900 text-white flex items-center justify-center shadow-2xl relative z-10 border border-slate-700">
-               <Cpu size={40} className="animate-pulse" />
-            </div>
+        <div className="h-[60vh] flex flex-col items-center justify-center text-center animate-in fade-in duration-300">
+          <div className="mb-8">
+             <Loader2 size={48} className="text-indigo-600 animate-spin" />
           </div>
-          <div className="space-y-6">
-            <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic flex items-center justify-center space-x-4">
-               <span>Synthesizing Intelligence</span>
-            </h3>
+          <div className="space-y-4">
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Creative Syncing</h3>
             <div className="flex flex-col items-center">
-              <p className="text-indigo-600 font-mono text-xs font-bold uppercase tracking-[0.3em] h-4 transition-all duration-500">
+              <div className="bg-slate-900 text-white px-4 py-1 text-[10px] font-black uppercase tracking-[0.2em]">
                  {loaderMsg}
-              </p>
-              <div className="w-64 h-[2px] bg-slate-200 mt-6 relative overflow-hidden">
-                 <div className="absolute inset-y-0 bg-indigo-600 w-1/3 animate-[scanning_1.5s_infinite]"></div>
               </div>
             </div>
           </div>
-          <style>{`
-            @keyframes scanning {
-              0% { left: -33%; }
-              100% { left: 100%; }
-            }
-          `}</style>
         </div>
       );
     }
@@ -132,15 +111,15 @@ const App: React.FC = () => {
       {currentView === 'CAMPAIGNS' && (
         <div className="max-w-7xl mx-auto">
           {step !== AppStep.INPUT && step !== AppStep.GENERATING && (
-            <div className="mb-8 flex justify-between items-center bg-white p-4 border border-slate-200 shadow-sm animate-in slide-in-from-top-4 duration-500">
+            <div className="mb-6 flex justify-between items-center bg-white p-4 border border-slate-200 shadow-sm animate-in slide-in-from-top-2 duration-300">
                <div className="flex items-center space-x-3 text-xs font-mono text-slate-400">
-                  <span className="hover:text-indigo-600 cursor-pointer" onClick={handleGoToDashboard}>WORKSPACE</span>
+                  <span className="hover:text-indigo-600 cursor-pointer uppercase tracking-widest" onClick={handleGoToDashboard}>Workflow</span>
                   <span>/</span>
-                  <span className="text-slate-900 font-bold uppercase tracking-widest">{campaign?.name}</span>
+                  <span className="text-slate-900 font-black uppercase tracking-widest italic">{campaign?.name}</span>
                </div>
-               <button onClick={() => {setCampaign(null); setStep(AppStep.INPUT);}} className="text-[10px] font-black text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 border border-indigo-100 uppercase flex items-center space-x-2 transition-all">
+               <button onClick={() => {setCampaign(null); setStep(AppStep.INPUT);}} className="text-[10px] font-black text-indigo-600 hover:bg-indigo-50 px-4 py-2 border border-indigo-100 uppercase tracking-widest flex items-center space-x-2 transition-all">
                    <Plus size={14} />
-                   <span>Reset Entry</span>
+                   <span>Reset Pipeline</span>
                </button>
             </div>
           )}

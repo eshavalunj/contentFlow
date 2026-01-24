@@ -1,3 +1,4 @@
+
 import JSZip from 'jszip';
 import { Campaign } from '../types';
 
@@ -12,15 +13,21 @@ export const generateCampaignZip = async (campaign: Campaign): Promise<Blob> => 
     const themeFolder = folder.folder(themeName);
 
     if (themeFolder) {
-      // Add theme rationale
       themeFolder.file('rationale.txt', theme.rationale);
 
-      theme.posts.forEach((post, pIndex) => {
+      theme.posts.forEach((post) => {
         const platformFolder = themeFolder.folder(post.platform);
         if (platformFolder) {
-            const filename = `post_${pIndex + 1}_${post.platform}.txt`;
-            const content = `SCHEDULED FOR: ${post.scheduledDate || 'Not Scheduled'}\n\nCONTENT:\n${post.content}\n\nIMAGE PROMPT:\n${post.imageDescription}`;
-            platformFolder.file(filename, content);
+            post.versions.forEach((v, vIndex) => {
+                const versionFolder = platformFolder.folder(`Version_${vIndex + 1}_${v.label.replace(/\s+/g, '_')}`);
+                if (versionFolder) {
+                    // Fix: PostVersion represents a single post, not a collection of frames.
+                    // Correcting the logic to export the version's content directly.
+                    const filename = `content.txt`;
+                    const fileContent = `LABEL: ${v.label}\n\nCOPY:\n${v.content}\n\nIMAGE PROMPT:\n${v.imageDescription}`;
+                    versionFolder.file(filename, fileContent);
+                }
+            });
         }
       });
     }
